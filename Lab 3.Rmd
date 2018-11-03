@@ -1,0 +1,177 @@
+---
+title: "Lab 3"
+output: 
+html_document:
+  toc: TRUE
+  toc_depth: 2
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+setwd("~/Desktop/Data Mining and Big Data")
+
+```
+
+```{r}
+library(class)
+library(gmodels)
+
+```
+
+##Exploring the Data
+
+```{r}
+wbcd <- read.csv("data.csv", stringsAsFactors = FALSE)
+str(wbcd)
+
+#Loading the breast cancer dataset into R, and viewing a summary of the data.
+
+```
+
+```{r}
+wbcd <- wbcd[-1]
+str(wbcd)
+
+#Removing the id feature from the analysis, because this variable could lead to overfitting of the model. This variable could be used to directly predict each example.
+
+
+```
+
+```{r}
+table(wbcd$diagnosis)
+
+#Our target variable is diagnosis, because it is the variable whose outcome we are attempting to predict. From the table function, we can see that there are 357 cases of "benign" and 212 cases of "malignant" diagnoses.
+
+```
+
+```{r}
+wbcd$diagnosis <- factor(wbcd$diagnosis, levels = c("B", "M"), labels = c("Benign", "Malignant"))
+
+#Renaming the diagnosis variable to be more descriptive, changing the "B" and "M" variables to "Benign" and "Malignant."
+
+round(prop.table(table(wbcd$diagnosis)) * 100, digits = 1)
+
+#Creating a proportion table to see the percentage of cases that are Benign and Malignant.
+
+```
+
+```{r}
+summary(wbcd[c("radius_mean", "area_mean", "smoothness_mean")])
+
+#Something problematic about these variables is the range of the variables' values. These variables' values need to be normalized which I wil do in the next section.
+
+```
+
+
+##Transformation: Normalizing Numeric Data
+
+```{r}
+normalize <- function(x) {
+  return ((x - min(x)) / (max(x) - min(x)))
+}
+
+#This function takes a vector x of numeric values and for each value in x, subtracts the minimum value in x and divdes by the range of values in x.
+
+```
+
+```{r}
+normalize(c(1, 2, 3, 4, 5))
+normalize(c(10, 20, 30, 40, 50))
+
+#The function appears to be working correctly. Although the values in the second vector are 10 times larger than in the first vector, the values are the same.
+
+```
+
+```{r}
+wbcd_n <- as.data.frame(lapply(wbcd[2:31], normalize))
+
+#The lapply function takes a list and applies a specified function to each list element. As a data frame is a list of equal-length vectors, we can use laaply to apply normalize to each feature in the data frame.
+
+#This command applies the normalize function to columns 2 through 31 in the wbcd data frame, converts the resulting list to a data frame, and assigns it the name wbcd_n.
+
+```
+
+```{r}
+summary(wbcd_n$area_mean)
+
+#We can see that the normalize function is working becaue the preivous wide range of values in the area_mean variable are now normalized between 0 and 1.
+
+```
+
+##Data Preparation: Creating Training and Test Datasets
+
+```{r}
+wbcd_train <- wbcd_n[1:469, ]
+wbcd_test <- wbcd_n[470:569, ]
+
+wbcd_train_labels <- wbcd[1:469, 1]
+wbcd_test_labels <- wbcd[470:569, 1]
+length(wbcd_test_labels)
+
+#Training set is used to build the k-NN model and the test set is used to estimate the predictive accuracy of the model.
+#For training the k-NN model, we will need to store these class labels in factor vectors, split between the training and test datasets.
+
+
+```
+
+##Training a Model on the Data
+
+```{r}
+wbcd_test_pred <- knn(train = wbcd_train, test = wbcd_test, cl = wbcd_train_labels, k = 21)
+
+#Creating the prediction algorithm using the knn function.
+
+```
+
+##Evaluating Model Performance
+
+```{r}
+CrossTable(x = wbcd_test_labels, y = wbcd_test_pred, prop.chisq = TRUE)
+
+#There are only two cases when there is a type 2 error, or an incorrectly diagnosis. In our case, there are two cases where the true diagnosis was malignant but our model predicted benign.
+
+```
+
+##Improving our Model
+
+#Z-Score Method
+
+```{r}
+wbcd_z <- as.data.frame(scale(wbcd[-1]))
+summary(wbcd_z$area_mean)
+wbcd_z <- as.data.frame(lapply(wbcd[2:31], normalize))
+
+#From the mean of 0 and a compact range, we can see that this function worked successfully.
+
+wbcd_train2 <- wbcd_z[1:469, ]
+wbcd_test2 <- wbcd_z[470:569, ]
+wbcd_train_labels2 <- wbcd[1:469, 1]
+wbcd_test_labels2 <- wbcd[470:569, 1]
+
+wbcd_test_pred2 <- knn(train = wbcd_train2, test = wbcd_test2,
+                        cl = wbcd_train_labels2, k = 21)
+
+
+CrossTable(x = wbcd_test_labels2, y = wbcd_test_pred2, prop.chisq = FALSE)
+
+```
+
+#Testing Alternative Values of K
+
+```{r}
+wbcd_train <- wbcd_n[1:469, ]
+wbcd_test <- wbcd_n[470:569, ]
+
+wbcd_train_labels <- wbcd[1:469, 1]
+wbcd_test_labels <- wbcd[470:569, 1]
+
+wbcd_test_pred2 <- knn(train = wbcd_train, test = wbcd_test, cl = wbcd_train_labels, k = 2)
+CrossTable(x = wbcd_test_labels, y = wbcd_test_pred2, prop.chisq = TRUE)
+
+#With a smaller k value, we get more errors and the algorithm is less accurate.
+
+```
+
